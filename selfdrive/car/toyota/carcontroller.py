@@ -1,5 +1,5 @@
 from cereal import car
-from common.numpy_fast import clip
+from common.numpy_fast import clip, interp
 from selfdrive.car import apply_toyota_steer_torque_limits, create_gas_command, make_can_msg
 from selfdrive.car.toyota.toyotacan import create_steer_command, create_ui_command, \
                                            create_accel_command, create_acc_cancel_command, \
@@ -11,9 +11,11 @@ VisualAlert = car.CarControl.HUDControl.VisualAlert
 
 # Accel limits
 ACCEL_HYST_GAP = 0.02  # don't change accel command for small oscilalitons within this value
-ACCEL_MAX = 1.5  # 1.5 m/s2
+ACCEL_MAX = 1.0  # 1.0 m/s2
 ACCEL_MIN = -3.0  # 3   m/s2
 ACCEL_SCALE = max(ACCEL_MAX, -ACCEL_MIN)
+ACCEL_MAX_BP = [0., 5., 20., 35.]
+ACCEL_MAX_V = [ACCEL_MAX * 0.75, ACCEL_MAX, ACCEL_MAX * 0.80, ACCEL_MAX * 0.5]
 
 def accel_hysteresis(accel, accel_steady, enabled):
 
@@ -65,7 +67,8 @@ class CarController():
       apply_accel = actuators.gas - actuators.brake
 
     apply_accel, self.accel_steady = accel_hysteresis(apply_accel, self.accel_steady, enabled)
-    apply_accel = clip(apply_accel * ACCEL_SCALE, ACCEL_MIN, ACCEL_MAX)
+    new_accel_max = interp(CS.out.vEgo, ACCEL_MAX_BP, ACCEL_MAX_V)
+    apply_accel = clip(apply_accel * ACCEL_SCALE, ACCEL_MIN, new_accel_max)
 
     # steer torque
     new_steer = int(round(actuators.steer * SteerLimitParams.STEER_MAX))
